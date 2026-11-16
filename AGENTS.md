@@ -28,7 +28,7 @@ and `herdr agent wait` reflect CodeBuddy's real status:
   **directly to the Herdr socket API** (`HERDR_SOCKET_PATH`) using
   newline-delimited JSON — NOT the `herdr` CLI, which is slower and not meant
   for high-frequency reporting.
-- `hooks/hooks.json` — wires the 6 events above to the reporter. The hook
+- `hooks/hooks.json` — wires the 7 events above to the reporter. The hook
   command is `node "${CODEBUDDY_PLUGIN_ROOT}/bin/herdr-report.js"`: CodeBuddy
   expands `${CODEBUDDY_PLUGIN_ROOT}` at load time, which keeps the command
   identical under `sh`, `cmd.exe`, and PowerShell. Never wrap it in `|| true`

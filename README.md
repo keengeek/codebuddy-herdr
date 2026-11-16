@@ -66,6 +66,7 @@ node script/install-dev.mjs      # or: bash script/install-dev.sh
 | SessionStart      | `idle`       | also stores `codebuddy --resume <session_id>` so Herdr can reopen the session after a restart |
 | UserPromptSubmit  | `working`    | |
 | PreToolUse        | `working`    | |
+| PostToolUse       | `working`    | re-asserts `working`, clearing a stale `blocked` |
 | Stop              | `idle`       | |
 | Notification      | `blocked` / `idle` | `permission_prompt`, `elicitation_dialog`, and `agent_needs_input` report `blocked` (surfacing the pending question); `idle_prompt` and `agent_completed` report `idle`; anything else is ignored |
 | SessionEnd        | release      | clears the agent from the pane |
@@ -76,7 +77,7 @@ These states show up in the Herdr sidebar and `herdr agent list`, and drive
 ## How it works
 
 - CodeBuddy fires hook events; `hooks/hooks.json` runs
-  `node "${CODEBUDDY_PLUGIN_ROOT}/bin/herdr-report.js"` for each of the six
+  `node "${CODEBUDDY_PLUGIN_ROOT}/bin/herdr-report.js"` for each of the seven
   events above. CodeBuddy expands `${CODEBUDDY_PLUGIN_ROOT}` at load time, so
   the command is identical under `sh`, `cmd.exe`, and PowerShell, and the
   reporter swallows every error itself. Nothing can break your session even if
@@ -111,7 +112,7 @@ link or copy the folder there yourself.
 ```
 codebuddy-herdr/
 ├── .codebuddy-plugin/plugin.json   # plugin manifest
-├── hooks/hooks.json                # wires 6 hook events to the reporter
+├── hooks/hooks.json                # wires 7 hook events to the reporter
 ├── src/herdr-report.ts              # TypeScript reporter source
 ├── bin/herdr-report.js              # prebuilt Node runtime for hooks
 ├── commands/herdr-status.md        # /codebuddy-herdr:herdr-status helper
@@ -132,4 +133,4 @@ codebuddy-herdr/
 
 ## License
 
-MIT — see repository for details.
+MIT — see [LICENSE](LICENSE).
