@@ -114,9 +114,10 @@ codebuddy-herdr/
 
 - CodeBuddy with plugin support.
 - Herdr 0.9+ running the pane (state is only reported when `HERDR_ENV=1`).
-- Node.js 18+ and the standard Unix `flock` utility available on PATH. The
-  packaged runtime has no npm dependencies; TypeScript is only needed to build
-  from source (`npm ci && npm run build`).
+- Node.js 18+ on macOS, Linux, or Windows. The packaged runtime has no npm
+  dependencies and needs no external utilities (`seq` locking is done in
+  JavaScript); TypeScript is only needed to build from source
+  (`npm ci && npm run build`).
 
 ## License
 

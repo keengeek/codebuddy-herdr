@@ -41,6 +41,9 @@ If the user says CodeBuddy is not showing up in Herdr, or state looks wrong:
 1. Confirm HERDR_ENV=1 in this shell.
 2. Run "herdr agent list" and "herdr pane get $HERDR_PANE_ID".
 3. Check the seq counter file in $TMPDIR/herdr-codebuddy-seq-* (one per pane).
+   A leftover herdr-codebuddy-seq-*.lock file is harmless: locks older than 5
+   seconds are broken automatically. If the counter file does not exist at all,
+   no report has ever reached the socket from this pane.
 4. Manually exercise a report:
 
    echo '{"hook_event_name":"PreToolUse","session_id":"test"}' \

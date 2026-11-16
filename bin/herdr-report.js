@@ -5,17 +5,17 @@
  * This file is compiled to bin/herdr-report.js before publishing.  Keeping the
  * runnable JavaScript in the package means hooks do not need ts-node or tsx.
  */
-import { closeSync, fsyncSync, openSync, readFileSync, writeFileSync } from "node:fs";
+import { closeSync, openSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
 import net from "node:net";
 const SOURCE = "codebuddy";
 const AGENT = "CodeBuddy";
 const RESUME_BIN = "codebuddy";
 const SOCKET_TIMEOUT_MS = 500;
-const REPORTER_PATH = fileURLToPath(import.meta.url);
+const SEQ_LOCK_TIMEOUT_MS = 450;
+const SEQ_LOCK_RETRY_MS = 2;
+const SEQ_LOCK_STALE_MS = 5_000;
 function counterPath() {
     const pane = process.env.HERDR_PANE_ID ?? "none";
     // Pane IDs normally only contain ':' as punctuation.  Keeping the filename
@@ -23,47 +23,83 @@ function counterPath() {
     const safePane = pane.replace(/[^A-Za-z0-9._-]/g, "_");
     return join(process.env.TMPDIR || tmpdir(), `herdr-codebuddy-seq-${safePane}`);
 }
-function lockedNextSeq(base, path) {
-    try {
-        const lastText = readFileSync(path, "utf8").trim();
-        const last = /^\d+$/.test(lastText) ? BigInt(lastText) : 0n;
-        const next = base > last ? base : last + 1n;
-        const descriptor = openSync(path, "r+");
-        try {
-            writeFileSync(descriptor, next.toString(), "utf8");
-            fsyncSync(descriptor);
-        }
-        finally {
-            closeSync(descriptor);
-        }
-        return next;
-    }
-    catch {
-        return undefined;
-    }
+/** Short synchronous sleep, so hooks stay inside their tight time budget. */
+function sleepSync(ms) {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 /**
- * Node core has no flock API.  Run the same program under the platform's
- * flock utility, which holds an fcntl advisory lock on the counter file while
- * the inner process reads and writes it.  A failed/timed-out lock returns no
- * sequence, causing the hook to be safely dropped rather than risking an
- * out-of-order report.
+ * Node core exposes no flock(2) and macOS ships no flock(1) utility, so the
+ * counter file is guarded by an O_EXCL lock file instead.  The lock is held for
+ * two synchronous file operations only, so a bounded retry loop is enough.  A
+ * lock older than SEQ_LOCK_STALE_MS is treated as left behind by a crash.
  */
+function acquireLock(lockPath) {
+    const deadline = Date.now() + SEQ_LOCK_TIMEOUT_MS;
+    for (;;) {
+        try {
+            return openSync(lockPath, "wx");
+        }
+        catch (error) {
+            if (error.code !== "EEXIST")
+                return undefined;
+        }
+        try {
+            if (Date.now() - statSync(lockPath).mtimeMs > SEQ_LOCK_STALE_MS)
+                unlinkSync(lockPath);
+        }
+        catch {
+            // The holder released the lock in the meantime; just retry.
+        }
+        if (Date.now() >= deadline)
+            return undefined;
+        sleepSync(SEQ_LOCK_RETRY_MS);
+    }
+}
+function releaseLock(descriptor, lockPath) {
+    try {
+        closeSync(descriptor);
+    }
+    catch {
+        // Closing a lock file must never break the hook.
+    }
+    try {
+        unlinkSync(lockPath);
+    }
+    catch {
+        // Another process may have already removed a stale lock.
+    }
+}
 function nextSeq() {
     // Date.now supplies the wall-clock nanosecond base; the monotonic clock's
     // sub-millisecond part avoids most same-millisecond collisions. The locked
     // persisted counter handles the remaining cases and clock rollback.
     const base = BigInt(Date.now()) * 1000000n + (process.hrtime.bigint() % 1000000n);
     const path = counterPath();
+    const lockPath = `${path}.lock`;
+    // A lock we cannot take drops this report instead of risking an
+    // out-of-order sequence, which Herdr would ignore anyway.
+    const descriptor = acquireLock(lockPath);
+    if (descriptor === undefined)
+        return undefined;
     try {
-        const result = spawnSync("flock", ["-x", "-w", "0.45", path, process.execPath, REPORTER_PATH, "--locked-next-seq", base.toString(), path], { encoding: "utf8", timeout: SOCKET_TIMEOUT_MS });
-        if (result.status !== 0 || result.error)
-            return undefined;
-        const output = result.stdout.trim();
-        return /^\d+$/.test(output) ? BigInt(output) : undefined;
+        let last = 0n;
+        try {
+            const lastText = readFileSync(path, "utf8").trim();
+            if (/^\d+$/.test(lastText))
+                last = BigInt(lastText);
+        }
+        catch {
+            // First report for this pane: the counter file does not exist yet.
+        }
+        const next = base > last ? base : last + 1n;
+        writeFileSync(path, next.toString(), "utf8");
+        return next;
     }
     catch {
         return undefined;
+    }
+    finally {
+        releaseLock(descriptor, lockPath);
     }
 }
 function asString(value) {
@@ -135,20 +171,6 @@ async function reportState(pane, state, message) {
     });
 }
 async function main() {
-    if (process.argv[2] === "--locked-next-seq") {
-        const base = process.argv[3];
-        const path = process.argv[4];
-        if (!base || !path || !/^\d+$/.test(base))
-            process.exitCode = 1;
-        else {
-            const seq = lockedNextSeq(BigInt(base), path);
-            if (seq === undefined)
-                process.exitCode = 1;
-            else
-                process.stdout.write(`${seq.toString()}\n`);
-        }
-        return;
-    }
     if (process.env.HERDR_ENV !== "1")
         return;
     const pane = process.env.HERDR_PANE_ID;

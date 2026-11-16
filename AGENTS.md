@@ -48,9 +48,10 @@ and `herdr agent wait` reflect CodeBuddy's real status:
    0.5s socket timeout, and the hook command ends with `|| true`. Do not add
    network calls, blocking waits, or loud failures.
 4. **`seq` must be monotonically increasing** per pane. The reporter derives it
-   from `time.time_ns()` + a persisted counter file in `$TMPDIR`
-   (`herdr-codebuddy-seq-<pane>`), guarded by `fcntl.flock`. Never send a
-   non-increasing seq or Herdr will reject the update.
+   from `Date.now()` nanoseconds + a persisted counter file in `$TMPDIR`
+   (`herdr-codebuddy-seq-<pane>`), guarded by an `O_EXCL` `<counter>.lock` file
+   (Node has no `flock`, and macOS ships no `flock(1)`). Never send a
+   non-increasing seq or Herdr will ignore the update.
 5. **Resume command rules** (Herdr): `resume_argv`'s first token must be a
    plain command on PATH, no apostrophes/control chars, ≤64 args, ≤8 KiB.
    We store `["codebuddy", "--resume", session_id]`.
