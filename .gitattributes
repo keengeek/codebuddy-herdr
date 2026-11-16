@@ -1,0 +1,3 @@
+# Keep the working tree byte-identical across platforms so the CI check that
+# compares the committed build output does not trip over line endings.
+* text=auto eol=lf

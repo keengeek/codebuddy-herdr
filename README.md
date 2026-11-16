@@ -121,6 +121,16 @@ codebuddy-herdr/
 └── script/install-dev.sh           # thin bash wrapper for the same script
 ```
 
+## Development
+
+```bash
+npm ci        # build tooling only; the plugin runtime has no dependencies
+npm test      # rebuilds bin/ and runs the unit tests (no Herdr needed)
+```
+
+CI runs those two commands on macOS, Linux, and Windows, and fails if the
+committed `bin/herdr-report.js` does not match `src/herdr-report.ts`.
+
 ## Requirements
 
 - CodeBuddy with plugin support.
