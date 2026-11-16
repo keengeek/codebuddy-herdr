@@ -67,7 +67,7 @@ node script/install-dev.mjs      # or: bash script/install-dev.sh
 | UserPromptSubmit  | `working`    | |
 | PreToolUse        | `working`    | |
 | Stop              | `idle`       | |
-| Notification (permission / prompt / decision) | `blocked` | surfaces the pending question as the message |
+| Notification      | `blocked` / `idle` | `permission_prompt`, `elicitation_dialog`, and `agent_needs_input` report `blocked` (surfacing the pending question); `idle_prompt` and `agent_completed` report `idle`; anything else is ignored |
 | SessionEnd        | release      | clears the agent from the pane |
 
 These states show up in the Herdr sidebar and `herdr agent list`, and drive

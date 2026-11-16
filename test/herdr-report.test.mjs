@@ -144,6 +144,32 @@ test("idle_prompt Notification reports idle, not blocked", async (t) => {
   assert.equal(params.message, undefined);
 });
 
+test("notification types map to the documented states", async (t) => {
+  const f = await fixture();
+  t.after(() => f.close());
+  for (const [notification_type, message] of [
+    ["permission_prompt", "Allow write?"],
+    ["elicitation_dialog", "Pick a branch"],
+    ["agent_needs_input", "Background task blocked"],
+    ["idle_prompt", "Waiting for your input"],
+    ["agent_completed", "Background task finished"],
+    ["auth_success", "Signed in"],
+  ]) {
+    await invoke({ hook_event_name: "Notification", notification_type, message }, f.env);
+  }
+  await waitForRequests(f.requests, 5);
+  assert.deepEqual(
+    f.requests.map(({ request }) => [request.params.state, request.params.message]),
+    [
+      ["blocked", "Allow write?"],
+      ["blocked", "Pick a branch"],
+      ["blocked", "Background task blocked"],
+      ["idle", undefined],
+      ["idle", undefined],
+    ],
+  );
+});
+
 test("irrelevant notifications and processes outside Herdr are no-ops", async (t) => {
   const f = await fixture();
   t.after(() => f.close());

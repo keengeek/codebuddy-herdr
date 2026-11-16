@@ -16,6 +16,41 @@ const SOCKET_TIMEOUT_MS = 500;
 const SEQ_LOCK_TIMEOUT_MS = 450;
 const SEQ_LOCK_RETRY_MS = 2;
 const SEQ_LOCK_STALE_MS = 5_000;
+/**
+ * CodeBuddy's Notification hook only fires for the types listed by
+ * `shouldSendNotification` plus background-task events:
+ *
+ *   permission_prompt   tool permission request          -> blocked
+ *   elicitation_dialog  structured question (MCP / ACP)  -> blocked
+ *   agent_needs_input   background agent blocked          -> blocked
+ *   idle_prompt         turn finished, awaits the user    -> idle
+ *   agent_completed     background agent finished         -> idle
+ *   auth_success        informational only                -> ignored
+ *
+ * Only these exact values are mapped. `idle_prompt` in particular must not be
+ * treated as "prompt", or a finished turn would stick as blocked forever.
+ */
+const NOTIFICATION_STATES = {
+    permission_prompt: "blocked",
+    elicitation_dialog: "blocked",
+    agent_needs_input: "blocked",
+    idle_prompt: "idle",
+    agent_completed: "idle",
+};
+/** Compare notification types independently of case and separator style. */
+function notificationKey(value) {
+    return asString(value).toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+function notificationState(value) {
+    const key = notificationKey(value);
+    if (!key)
+        return undefined;
+    for (const [type, state] of Object.entries(NOTIFICATION_STATES)) {
+        if (notificationKey(type) === key)
+            return state;
+    }
+    return undefined;
+}
 function counterPath() {
     const pane = process.env.HERDR_PANE_ID ?? "none";
     // Pane IDs normally only contain ':' as punctuation.  Keeping the filename
@@ -216,15 +251,14 @@ async function main() {
         return;
     }
     if (event === "Notification") {
-        const notificationType = asString(hook.notification_type).toLowerCase();
-        if (notificationType === "idle_prompt") {
-            // idle_prompt means the agent finished and awaits the user's next input;
-            // it is not blocked. Report idle, else the "prompt" substring below would
-            // misclassify a finished turn as blocked (a sticky wrong state).
-            await reportState(pane, "idle");
-        }
-        else if (/(permission|prompt|decision)/.test(notificationType)) {
+        const state = notificationState(hook.notification_type);
+        // Unknown notification types stay a no-op: guessing a state is worse than
+        // leaving the last known one in place.
+        if (state === "blocked") {
             await reportState(pane, "blocked", asString(hook.message) || "needs input");
+        }
+        else if (state === "idle") {
+            await reportState(pane, "idle");
         }
         return;
     }
