@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -11,7 +12,11 @@ const reporter = fileURLToPath(new URL("../bin/herdr-report.js", import.meta.url
 
 async function fixture() {
   const directory = await mkdtemp(join(tmpdir(), "codebuddy-herdr-test-"));
-  const socketPath = join(directory, "herdr.sock");
+  // macOS/Linux use a Unix domain socket; Windows uses a named pipe.
+  const socketPath =
+    process.platform === "win32"
+      ? `\\\\.\\pipe\\codebuddy-herdr-test-${randomUUID()}`
+      : join(directory, "herdr.sock");
   const requests = [];
   const server = net.createServer((socket) => {
     let raw = "";

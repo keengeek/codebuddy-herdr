@@ -5,7 +5,8 @@ argument-hint: "[pane_id]"
 
 You are running inside a Herdr pane if `HERDR_ENV=1`. Report the current Herdr
 visibility of this CodeBuddy session by running these commands (do not just
-describe them — actually run them):
+describe them — actually run them; on Windows use PowerShell equivalents such as
+`$env:HERDR_ENV` and `$env:HERDR_PANE_ID`):
 
 ```bash
 # Is CodeBuddy reporting to Herdr at all?

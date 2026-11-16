@@ -33,6 +33,12 @@ pane.release_agent):
 3. Release: on SessionEnd it clears the agent from the pane.
 
 The plugin source is "codebuddy"; it must not use the reserved "herdr:" prefix.
+The reporter runs on macOS, Linux, and Windows: `HERDR_SOCKET_PATH` is a Unix
+domain socket on macOS/Linux and a named pipe on Windows.
+
+This skill ships inside the plugin (`skills/herdr/SKILL.md`), so CodeBuddy loads
+it whenever the plugin is enabled. It is not copied into `~/.codebuddy/skills`;
+link or copy it there only if you want it without the plugin.
 
 ## Debugging
 

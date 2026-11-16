@@ -125,6 +125,16 @@ function asString(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
+/**
+ * Herdr exposes its API as a Unix domain socket on macOS/Linux and as a named
+ * pipe on Windows.  Windows reports the pipe name without the `\\.\pipe\`
+ * prefix, so add it back unless the path already carries it.
+ */
+function socketEndpoint(socketPath: string): string {
+  if (process.platform !== "win32") return socketPath;
+  return socketPath.startsWith("\\\\.\\pipe\\") ? socketPath : `\\\\.\\pipe\\${socketPath}`;
+}
+
 async function readHook(): Promise<HookPayload> {
   try {
     let raw = "";
@@ -164,7 +174,7 @@ async function send(method: string, params: AgentParams): Promise<void> {
       client.destroy();
       resolve();
     };
-    const client = net.createConnection({ path: socketPath });
+    const client = net.createConnection({ path: socketEndpoint(socketPath) });
     client.setTimeout(SOCKET_TIMEOUT_MS, finish);
     client.once("error", finish);
     // Herdr sends a small acknowledgement. Waiting for it (or EOF) avoids

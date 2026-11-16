@@ -46,17 +46,18 @@ codebuddy plugin enable codebuddy-herdr
 
 ### Dev (live symlink)
 
-For local development, `script/install-dev.sh` installs the plugin and replaces
+For local development, `script/install-dev.mjs` installs the plugin and replaces
 CodeBuddy's cache copy **and** package-sources copy with symlinks to this source
-directory, so edits apply live after `/reload-plugins`.
+directory, so edits apply live after `/reload-plugins`. It runs on macOS, Linux,
+and Windows (Windows uses directory junctions, no admin rights needed).
 
 ```bash
-bash script/install-dev.sh
+node script/install-dev.mjs      # or: bash script/install-dev.sh
 # then in CodeBuddy: /reload-plugins
 ```
 
 > CodeBuddy keeps a hash-based plugin cache. A full CodeBuddy restart can replace
-> the symlink with a copy — just re-run `script/install-dev.sh` to restore it.
+> the symlink with a copy — just re-run the installer to restore it.
 
 ## What it reports
 
@@ -75,13 +76,16 @@ These states show up in the Herdr sidebar and `herdr agent list`, and drive
 ## How it works
 
 - CodeBuddy fires hook events; `hooks/hooks.json` runs
-  `node "$CODEBUDDY_PLUGIN_ROOT/bin/herdr-report.js" || true` for each of the
-  six events above. The `|| true` and the script's own error-swallowing keep
-  your session safe even if Herdr is unavailable.
+  `node "${CODEBUDDY_PLUGIN_ROOT}/bin/herdr-report.js"` for each of the six
+  events above. CodeBuddy expands `${CODEBUDDY_PLUGIN_ROOT}` at load time, so
+  the command is identical under `sh`, `cmd.exe`, and PowerShell, and the
+  reporter swallows every error itself. Nothing can break your session even if
+  Herdr is unavailable.
 - `src/herdr-report.ts` is the TypeScript source; its checked-in build output,
   `bin/herdr-report.js`, reads the hook JSON from stdin and talks **directly to
   the Herdr local socket API** (`HERDR_SOCKET_PATH`) using newline-delimited
-  JSON — not the slower `herdr` CLI. It is a no-op unless `HERDR_ENV=1`.
+  JSON — not the slower `herdr` CLI. The socket is a Unix domain socket on
+  macOS/Linux and a named pipe on Windows. It is a no-op unless `HERDR_ENV=1`.
 - The integration source is `codebuddy`, a stable plugin-owned identity. The
   reserved `herdr:` prefix is for integrations shipped by Herdr.
 
@@ -97,6 +101,11 @@ pane. To inspect how this session appears in Herdr, run the bundled command:
 It shows `HERDR_ENV`, the pane id, `herdr agent list`, and `herdr pane get` for
 this pane, and explains the current state.
 
+The bundled `herdr` skill is shipped inside the plugin (`skills/herdr/SKILL.md`),
+so CodeBuddy loads it whenever the plugin is enabled — nothing is copied into
+`~/.codebuddy/skills`. If you want it available without enabling the plugin,
+link or copy the folder there yourself.
+
 ## Files
 
 ```
@@ -107,17 +116,19 @@ codebuddy-herdr/
 ├── bin/herdr-report.js              # prebuilt Node runtime for hooks
 ├── commands/herdr-status.md        # /codebuddy-herdr:herdr-status helper
 ├── skills/herdr/SKILL.md           # debugging reference skill
-└── script/install-dev.sh           # dev install (symlink) script
+├── script/install-dev.mjs          # dev install (symlink) script, portable
+└── script/install-dev.sh           # thin bash wrapper for the same script
 ```
 
 ## Requirements
 
 - CodeBuddy with plugin support.
 - Herdr 0.9+ running the pane (state is only reported when `HERDR_ENV=1`).
-- Node.js 18+ on macOS, Linux, or Windows. The packaged runtime has no npm
-  dependencies and needs no external utilities (`seq` locking is done in
-  JavaScript); TypeScript is only needed to build from source
+- Node.js 18+ on PATH. The packaged runtime has no npm dependencies and needs no
+  external utilities — socket access, `seq` locking, and the dev installer are
+  all plain Node/JavaScript. TypeScript is only needed to build from source
   (`npm ci && npm run build`).
+- macOS, Linux, or Windows. Nothing is Unix-specific.
 
 ## License
 
