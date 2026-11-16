@@ -54,7 +54,7 @@ echo "Package-sources: $PKG_SRC"
 
 relink() {
   local target="$1" linkname="$2"
-  if [ -L "$linkname" ] && [ "$(readlink -f "$linkname")" = "$(readlink -f "$target")" ]; then
+  if [ -L "$linkname" ] && [ "$(cd "$linkname" && pwd -P)" = "$(cd "$target" && pwd -P)" ]; then
     echo "  already linked: $linkname"
     return
   fi
